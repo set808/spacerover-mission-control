@@ -74,7 +74,6 @@ services:
       - MONGODB_URI=mongodb://mongodb:27017/spacerover
       - PORT=6000
       - LOG_LEVEL=debug
-
       - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
       - NEW_RELIC_APP_NAME=SpaceRover-TelemetryProcessor
       - NEW_RELIC_DISTRIBUTED_TRACING_ENABLED=true
@@ -99,12 +98,8 @@ services:
 
   mongodb:
     image: mongo:latest
-    # ports:
-    #   # Only expose to host if necessary for debugging
-    #   # - "27017:27017"
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER:-admin}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD:-password}
+    ports:
+      - "27017:27017"
     volumes:
       - mongodb_data:/data/db
       - ./init-mongo:/docker-entrypoint-initdb.d:ro
