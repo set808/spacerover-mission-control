@@ -1,0 +1,151 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NODE_ENV=development
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:4000
+      - REACT_APP_NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
+    volumes:
+      - ./frontend:/app:ro
+      - /app/node_modules
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://mongodb:27017/spacerover
+      - PORT=4000
+      - LOG_LEVEL=debug
+      - TELEMETRY_SERVICE_URL=http://telemetry:6000
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
+      - NEW_RELIC_APP_NAME=SpaceRover-FleetCommand
+      - NEW_RELIC_BROWSER_MONITORING_ENABLE=true
+      - NEW_RELIC_DISTRIBUTED_TRACING_ENABLED=true
+      - ENABLE_SIMULATED_ISSUES=true
+    volumes:
+      - ./backend:/app:ro
+      - /app/node_modules
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:4000/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.7'
+          memory: 1G
+
+  telemetry:
+    build:
+      context: ./telemetry
+      dockerfile: Dockerfile
+    ports:
+      - "6000:6000"
+    environment:
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://mongodb:27017/spacerover
+      - PORT=6000
+      - LOG_LEVEL=debug
+
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
+      - NEW_RELIC_APP_NAME=SpaceRover-TelemetryProcessor
+      - NEW_RELIC_DISTRIBUTED_TRACING_ENABLED=true
+      - ENABLE_SIMULATION=true
+    volumes:
+      - ./telemetry:/app:ro
+      - /app/node_modules
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:6000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 768M
+
+  mongodb:
+    image: mongo:latest
+    # ports:
+    #   # Only expose to host if necessary for debugging
+    #   # - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD:-password}
+    volumes:
+      - mongodb_data:/data/db
+      - ./init-mongo:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+
+  load-generator:
+    build:
+      context: ./load-generator
+      dockerfile: Dockerfile
+    environment:
+      - API_URL=http://api:4000
+      - SCENARIO=${LOAD_SCENARIO:-default}
+      - INTENSITY=${LOAD_INTENSITY:-medium}
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: on-failure
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+
+volumes:
+  mongodb_data:
+    driver: local
+
+networks:
+  default:
+    driver: bridge

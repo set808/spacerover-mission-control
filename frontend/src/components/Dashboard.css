@@ -1,0 +1,46 @@
+.dashboard {
+    width: 100%;
+  }
+  
+  .dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  
+  .dashboard-controls {
+    display: flex;
+    align-items: center;
+  }
+  
+  .dashboard-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+  }
+  
+  .rover-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+  }
+  
+  .alert-panel {
+    background-color: var(--warning-color);
+    color: white;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+  }
+  
+  .alert-panel h2 {
+    margin-top: 0;
+    color: white;
+  }
+  
+  .alert-panel a {
+    color: white;
+    text-decoration: underline;
+  }

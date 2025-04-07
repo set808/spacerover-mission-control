@@ -1,0 +1,54 @@
+/* frontend/src/components/Header.css */
+.header {
+    background-color: var(--card-color);
+    padding: 10px 20px;
+    box-shadow: var(--shadow);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 1001;
+  }
+  
+  .header-left {
+    display: flex;
+    align-items: center;
+  }
+  
+  .toggle-sidebar {
+    background: none;
+    border: none;
+    padding: 5px;
+    margin-right: 15px;
+    cursor: pointer;
+    color: var(--text-color);
+  }
+  
+  .header-title {
+    font-size: 1.2rem;
+    font-weight: 500;
+    color: var(--text-color);
+  }
+  
+  .header-right {
+    display: flex;
+    align-items: center;
+  }
+  
+  .theme-toggle {
+    background: none;
+    border: none;
+    padding: 5px 10px;
+    margin-left: 10px;
+    cursor: pointer;
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+  }
+  
+  .theme-toggle svg {
+    margin-right: 5px;
+  }
+  
+  .user-menu {
+    margin-left: 20px;
+  }

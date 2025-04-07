@@ -1,0 +1,68 @@
+/* frontend/src/components/Sidebar.css */
+.sidebar {
+    width: 240px;
+    background-color: var(--card-color);
+    box-shadow: var(--shadow);
+    position: fixed;
+    height: 100%;
+    overflow-y: auto;
+    transition: transform 0.3s;
+    z-index: 1000;
+  }
+  
+  .sidebar.closed {
+    transform: translateX(-240px);
+  }
+  
+  .sidebar-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .sidebar-logo {
+    display: flex;
+    align-items: center;
+    color: var(--primary-color);
+    font-size: 1.2rem;
+    font-weight: 700;
+  }
+  
+  .sidebar-logo img {
+    width: 30px;
+    height: 30px;
+    margin-right: 10px;
+  }
+  
+  .sidebar-nav {
+    padding: 0;
+    list-style-type: none;
+  }
+  
+  .nav-item {
+    padding: 0;
+  }
+  
+  .nav-link {
+    display: flex;
+    align-items: center;
+    padding: 15px 20px;
+    color: var(--text-color);
+    text-decoration: none;
+    transition: background-color 0.2s;
+  }
+  
+  .nav-link:hover {
+    background-color: var(--hover-color);
+    text-decoration: none;
+  }
+  
+  .nav-link.active {
+    background-color: var(--primary-light);
+    color: white;
+  }
+  
+  .nav-icon {
+    margin-right: 10px;
+    width: 20px;
+    text-align: center;
+  }

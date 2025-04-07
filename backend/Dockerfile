@@ -1,0 +1,28 @@
+FROM node:16-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+
+RUN npm install
+
+RUN mkdir -p logs
+
+COPY newrelic.js ./
+
+COPY . .
+
+ENV NODE_ENV=development
+ENV PORT=4000
+ENV MONGODB_URI=mongodb://mongodb:27017/spacerover
+ENV LOG_LEVEL=debug
+ARG NEW_RELIC_LICENSE_KEY
+ENV NEW_RELIC_LICENSE_KEY=$NEW_RELIC_LICENSE_KEY
+ENV NEW_RELIC_APP_NAME=SpaceRover-FleetCommand
+ENV NEW_RELIC_BROWSER_MONITORING_ENABLED=true
+ENV NEW_RELIC_DISTRIBUTED_TRACING_ENABLED=true
+ENV ENABLE_SIMULATED_ISSUES=true
+
+EXPOSE 4000
+
+CMD ["node", "server.js"]
