@@ -115,6 +115,21 @@ services:
           cpus: '1.0'
           memory: 1G
 
+  newrelic-infra:
+    image: newrelic/infrastructure:latest
+    cap_add:
+      - SYS_PTRACE
+    network_mode: "host"
+    pid: "host"
+    privileged: true
+    volumes:
+      - "/:/host:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    environment:
+      - NRIA_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
+      - NRIA_DISPLAY_NAME=SpaceRover-Infrastructure
+      - NRIA_DOCKER_ENABLED=true
+
   load-generator:
     build:
       context: ./load-generator

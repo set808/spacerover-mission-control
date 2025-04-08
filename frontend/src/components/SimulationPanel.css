@@ -35,15 +35,17 @@
   padding: 10px;
   background-color: var(--hover-color);
   border-radius: 4px;
+  color: white;
 }
 
 .status-active {
-  color: var(--success-color);
-  font-weight: 500;
+  background-color: var(--success-color);
+  color: white !important;
 }
 
 .status-inactive {
-  color: var(--text-light);
+  background-color: var(--text-light);
+  color: white !important;
 }
 
 .simulation-controls {

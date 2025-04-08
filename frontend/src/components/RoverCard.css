@@ -4,6 +4,7 @@
     box-shadow: var(--shadow);
     padding: 20px;
     transition: transform 0.2s, box-shadow 0.2s;
+    color: #ffffff
   }
   
   .rover-card:hover {
@@ -32,7 +33,7 @@
   
   .rover-status {
     font-size: 0.8rem;
-    font-weight: 500;
+    font-weight: 600;
     padding: 4px 10px;
     border-radius: 12px;
     text-transform: uppercase;
@@ -40,7 +41,7 @@
   
   .status-active {
     background-color: var(--success-color);
-    color: white;
+    color: white !important;
   }
   
   .status-maintenance {
@@ -77,18 +78,20 @@
   
   .metric-label {
     font-size: 0.8rem;
-    color: var(--text-light);
+    color: rgba(255, 255, 255, 0.7);
     margin-bottom: 2px;
   }
   
   .metric-value {
     font-size: 1.1rem;
     font-weight: 500;
+    color: #ffffff
   }
   
   .rover-location {
     font-size: 0.9rem;
     margin-bottom: 15px;
+    color: #ffffff;
   }
   
   .rover-actions {

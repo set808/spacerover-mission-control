@@ -8,7 +8,6 @@ const winston = require("winston");
 const { createLogger, format, transports } = winston;
 const { combine, timestamp, printf, colorize } = format;
 
-// Configure logger
 const logger = createLogger({
   level: process.env.LOG_LEVEL || "info",
   format: combine(
