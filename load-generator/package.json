@@ -1,13 +1,12 @@
 {
-    "name": "spacerover-load-generator",
-    "version": "1.0.0",
-    "description": "Load Generator for SpaceRover Mission Control",
-    "main": "generator.js",
-    "scripts": {
-      "start": "node generator.js"
-    },
-    "dependencies": {
-      "axios": "^0.26.1",
-      "faker": "^6.6.6"
-    }
+  "name": "spacerover-load-generator",
+  "version": "1.0.0",
+  "description": "Load Generator for SpaceRover Mission Control",
+  "main": "generator.js",
+  "scripts": {
+    "start": "node generator.js"
+  },
+  "dependencies": {
+    "axios": "^0.26.1"
   }
+}

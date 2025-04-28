@@ -1,6 +1,7 @@
 const newrelic = require("newrelic");
 
 global.newrelic = newrelic;
+global.appStartTime = new Date();
 
 const express = require("express");
 const morgan = require("morgan");

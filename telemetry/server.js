@@ -1,4 +1,5 @@
-require("newrelic");
+const newrelic = require("newrelic");
+global.newrelic = newrelic;
 
 const express = require("express");
 const mongoose = require("mongoose");

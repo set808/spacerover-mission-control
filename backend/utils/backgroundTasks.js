@@ -70,21 +70,19 @@ function startBatteryUpdates() {
   intervals.batteryUpdates = setInterval(async () => {
     try {
       // Start New Relic custom segment
-      let endSegment;
+      let segment;
       if (global.newrelic) {
-        endSegment = global.newrelic.startSegment(
+        segment = global.newrelic.startSegment(
           "BackgroundTask:BatteryUpdates",
-          true,
-          async () => {
-            await updateRoverBatteries();
-            return true;
-          }
+          true
         );
-      } else {
-        await updateRoverBatteries();
       }
 
-      if (endSegment) endSegment();
+      try {
+        await updateRoverBatteries();
+      } finally {
+        if (segment) segment.end();
+      }
     } catch (err) {
       logger.error("Error in battery update task:", err);
 
@@ -109,6 +107,7 @@ async function updateRoverBatteries() {
   }
 
   let updatedCount = 0;
+  let lowBatteryCount = 0; // NEW: Track rovers with low battery
 
   // Update each rover's battery
   for (const rover of rovers) {
@@ -134,16 +133,35 @@ async function updateRoverBatteries() {
       rover.batteryLevel = parseFloat(newBatteryLevel.toFixed(1));
       await rover.save();
       updatedCount++;
+
+      // NEW: Track rovers with low battery (below 25%)
+      if (rover.batteryLevel < 25) {
+        lowBatteryCount++;
+      }
+
+      // NEW: Record individual battery level as a metric
+      if (global.newrelic) {
+        global.newrelic.recordMetric(
+          "Custom/Rover/BatteryLevel",
+          rover.batteryLevel
+        );
+      }
     }
   }
 
   logger.info(`Updated battery levels for ${updatedCount} rovers`);
 
-  // Record custom metric in New Relic
+  // Record custom metrics in New Relic
   if (global.newrelic) {
     global.newrelic.recordMetric(
       "Custom/BackgroundTasks/BatteryUpdates",
       updatedCount
+    );
+
+    // NEW: Record low battery count as a separate metric
+    global.newrelic.recordMetric(
+      "Custom/Rover/LowBatteryCount",
+      lowBatteryCount
     );
   }
 }
@@ -154,21 +172,19 @@ function startMissionProgressUpdates() {
   intervals.missionProgress = setInterval(async () => {
     try {
       // Start New Relic custom segment
-      let endSegment;
+      let segment;
       if (global.newrelic) {
-        endSegment = global.newrelic.startSegment(
+        segment = global.newrelic.startSegment(
           "BackgroundTask:MissionProgressUpdates",
-          true,
-          async () => {
-            await updateMissionProgress();
-            return true;
-          }
+          true
         );
-      } else {
-        await updateMissionProgress();
       }
 
-      if (endSegment) endSegment();
+      try {
+        await updateMissionProgress();
+      } finally {
+        if (segment) segment.end();
+      }
     } catch (err) {
       logger.error("Error in mission progress update task:", err);
 
@@ -277,21 +293,19 @@ function startRoverHealthChecks() {
   intervals.roverHealthCheck = setInterval(async () => {
     try {
       // Start New Relic custom segment
-      let endSegment;
+      let segment;
       if (global.newrelic) {
-        endSegment = global.newrelic.startSegment(
+        segment = global.newrelic.startSegment(
           "BackgroundTask:RoverHealthChecks",
-          true,
-          async () => {
-            await performRoverHealthChecks();
-            return true;
-          }
+          true
         );
-      } else {
-        await performRoverHealthChecks();
       }
 
-      if (endSegment) endSegment();
+      try {
+        await performRoverHealthChecks();
+      } finally {
+        if (segment) segment.end();
+      }
     } catch (err) {
       logger.error("Error in rover health check task:", err);
 
@@ -318,11 +332,20 @@ async function performRoverHealthChecks() {
   let criticalCount = 0;
   let repairedCount = 0;
   let lostSignalCount = 0;
+  let batteryLevels = []; // NEW: Track all battery levels
+
+  const appStartTime = global.appStartTime || new Date();
+  if (!global.appStartTime) {
+    global.appStartTime = appStartTime;
+  }
 
   // Check each rover's health
   for (const rover of rovers) {
     let statusChanged = false;
     let oldStatus = rover.status;
+
+    // NEW: Collect battery level data for all rovers
+    batteryLevels.push(rover.batteryLevel);
 
     // Check if rover hasn't sent telemetry for a while
     const lastContactTime = new Date(rover.lastContact).getTime();
@@ -330,8 +353,43 @@ async function performRoverHealthChecks() {
     const hoursSinceContact =
       (currentTime - lastContactTime) / (1000 * 60 * 60);
 
+    if (rover.status === ROVER_STATUSES.LOST_SIGNAL && hoursSinceContact < 1) {
+      rover.status = ROVER_STATUSES.ACTIVE;
+      statusChanged = true;
+      logger.info(`Rover signal recovered: ${rover.name}`, {
+        roverId: rover._id,
+        hoursSinceContact: hoursSinceContact.toFixed(1),
+      });
+    } else if (
+      hoursSinceContact > 2 &&
+      rover.status !== ROVER_STATUSES.LOST_SIGNAL &&
+      lastContactTime < appStartTime.getTime() - 2 * 60 * 60 * 1000
+    ) {
+      rover.status = ROVER_STATUSES.LOST_SIGNAL;
+      statusChanged = true;
+      lostSignalCount++;
+
+      logger.warn(`Rover lost signal: ${rover.name}`, {
+        roverId: rover._id,
+        hoursSinceContact: hoursSinceContact.toFixed(1),
+      });
+    }
+
+    if (rover.status === ROVER_STATUSES.LOST_SIGNAL && Math.random() < 0.2) {
+      // 20% chance
+      rover.status = ROVER_STATUSES.ACTIVE;
+      rover.lastContact = new Date(); // Update last contact to now
+      statusChanged = true;
+      logger.info(`Rover signal recovered randomly: ${rover.name}`, {
+        roverId: rover._id,
+      });
+    }
+
     // If no contact for over 2 hours, mark as lost signal
-    if (hoursSinceContact > 2 && rover.status !== ROVER_STATUSES.LOST_SIGNAL) {
+    else if (
+      hoursSinceContact > 2 &&
+      rover.status !== ROVER_STATUSES.LOST_SIGNAL
+    ) {
       rover.status = ROVER_STATUSES.LOST_SIGNAL;
       statusChanged = true;
       lostSignalCount++;
@@ -355,6 +413,16 @@ async function performRoverHealthChecks() {
           batteryLevel: rover.batteryLevel,
         }
       );
+
+      // NEW: Record specific critical battery event
+      if (global.newrelic) {
+        global.newrelic.recordCustomEvent("RoverCriticalBattery", {
+          roverId: rover._id.toString(),
+          roverName: rover.name,
+          batteryLevel: rover.batteryLevel,
+          timestamp: new Date().toISOString(),
+        });
+      }
     }
 
     // Randomly repair rovers in maintenance
@@ -390,6 +458,16 @@ async function performRoverHealthChecks() {
     `Completed rover health checks: ${criticalCount} critical, ${lostSignalCount} lost signal, ${repairedCount} repaired`
   );
 
+  // NEW: Calculate fleet-wide battery statistics
+  const avgBatteryLevel =
+    batteryLevels.length > 0
+      ? batteryLevels.reduce((sum, level) => sum + level, 0) /
+        batteryLevels.length
+      : 0;
+
+  const minBatteryLevel =
+    batteryLevels.length > 0 ? Math.min(...batteryLevels) : 0;
+
   // Record custom metrics in New Relic
   if (global.newrelic) {
     global.newrelic.recordMetric(
@@ -404,6 +482,31 @@ async function performRoverHealthChecks() {
       "Custom/BackgroundTasks/RoverHealthChecks/Repaired",
       repairedCount
     );
+
+    // NEW: Record detailed battery metrics
+    global.newrelic.recordMetric(
+      "Custom/Rover/CriticalBatteryCount",
+      criticalCount
+    );
+
+    // NEW: Individual battery levels for distribution visualization
+    rovers.forEach((rover) => {
+      global.newrelic.recordMetric(
+        "Custom/Rover/BatteryLevelDistribution",
+        rover.batteryLevel
+      );
+    });
+
+    // NEW: Record fleet-wide battery statistics
+    global.newrelic.recordMetric(
+      "Custom/Rover/AverageBatteryLevel",
+      avgBatteryLevel
+    );
+
+    global.newrelic.recordMetric(
+      "Custom/Rover/MinimumBatteryLevel",
+      minBatteryLevel
+    );
   }
 }
 
@@ -413,21 +516,19 @@ function startMaintenanceScheduler() {
   intervals.maintenanceScheduler = setInterval(async () => {
     try {
       // Start New Relic custom segment
-      let endSegment;
+      let segment;
       if (global.newrelic) {
-        endSegment = global.newrelic.startSegment(
+        segment = global.newrelic.startSegment(
           "BackgroundTask:MaintenanceScheduler",
-          true,
-          async () => {
-            await scheduleRoverMaintenance();
-            return true;
-          }
+          true
         );
-      } else {
-        await scheduleRoverMaintenance();
       }
 
-      if (endSegment) endSegment();
+      try {
+        await scheduleRoverMaintenance();
+      } finally {
+        if (segment) segment.end();
+      }
     } catch (err) {
       logger.error("Error in maintenance scheduler task:", err);
 
@@ -493,21 +594,19 @@ function startDataCleanupTask() {
   intervals.dataCleanup = setInterval(async () => {
     try {
       // Start New Relic custom segment
-      let endSegment;
+      let segment;
       if (global.newrelic) {
-        endSegment = global.newrelic.startSegment(
+        segment = global.newrelic.startSegment(
           "BackgroundTask:DataCleanup",
-          true,
-          async () => {
-            await performDataCleanup();
-            return true;
-          }
+          true
         );
-      } else {
-        await performDataCleanup();
       }
 
-      if (endSegment) endSegment();
+      try {
+        await performDataCleanup();
+      } finally {
+        if (segment) segment.end();
+      }
     } catch (err) {
       logger.error("Error in data cleanup task:", err);
 
