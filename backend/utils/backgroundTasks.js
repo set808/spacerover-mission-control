@@ -109,6 +109,7 @@ async function updateRoverBatteries() {
   }
 
   let updatedCount = 0;
+  let lowBatteryCount = 0; // NEW: Track rovers with low battery
 
   // Update each rover's battery
   for (const rover of rovers) {
@@ -134,16 +135,35 @@ async function updateRoverBatteries() {
       rover.batteryLevel = parseFloat(newBatteryLevel.toFixed(1));
       await rover.save();
       updatedCount++;
+
+      // NEW: Track rovers with low battery (below 25%)
+      if (rover.batteryLevel < 25) {
+        lowBatteryCount++;
+      }
+
+      // NEW: Record individual battery level as a metric
+      if (global.newrelic) {
+        global.newrelic.recordMetric(
+          "Custom/Rover/BatteryLevel",
+          rover.batteryLevel
+        );
+      }
     }
   }
 
   logger.info(`Updated battery levels for ${updatedCount} rovers`);
 
-  // Record custom metric in New Relic
+  // Record custom metrics in New Relic
   if (global.newrelic) {
     global.newrelic.recordMetric(
       "Custom/BackgroundTasks/BatteryUpdates",
       updatedCount
+    );
+
+    // NEW: Record low battery count as a separate metric
+    global.newrelic.recordMetric(
+      "Custom/Rover/LowBatteryCount",
+      lowBatteryCount
     );
   }
 }
@@ -318,11 +338,15 @@ async function performRoverHealthChecks() {
   let criticalCount = 0;
   let repairedCount = 0;
   let lostSignalCount = 0;
+  let batteryLevels = []; // NEW: Track all battery levels
 
   // Check each rover's health
   for (const rover of rovers) {
     let statusChanged = false;
     let oldStatus = rover.status;
+
+    // NEW: Collect battery level data for all rovers
+    batteryLevels.push(rover.batteryLevel);
 
     // Check if rover hasn't sent telemetry for a while
     const lastContactTime = new Date(rover.lastContact).getTime();
@@ -355,6 +379,16 @@ async function performRoverHealthChecks() {
           batteryLevel: rover.batteryLevel,
         }
       );
+
+      // NEW: Record specific critical battery event
+      if (global.newrelic) {
+        global.newrelic.recordCustomEvent("RoverCriticalBattery", {
+          roverId: rover._id.toString(),
+          roverName: rover.name,
+          batteryLevel: rover.batteryLevel,
+          timestamp: new Date().toISOString(),
+        });
+      }
     }
 
     // Randomly repair rovers in maintenance
@@ -390,6 +424,16 @@ async function performRoverHealthChecks() {
     `Completed rover health checks: ${criticalCount} critical, ${lostSignalCount} lost signal, ${repairedCount} repaired`
   );
 
+  // NEW: Calculate fleet-wide battery statistics
+  const avgBatteryLevel =
+    batteryLevels.length > 0
+      ? batteryLevels.reduce((sum, level) => sum + level, 0) /
+        batteryLevels.length
+      : 0;
+
+  const minBatteryLevel =
+    batteryLevels.length > 0 ? Math.min(...batteryLevels) : 0;
+
   // Record custom metrics in New Relic
   if (global.newrelic) {
     global.newrelic.recordMetric(
@@ -403,6 +447,31 @@ async function performRoverHealthChecks() {
     global.newrelic.recordMetric(
       "Custom/BackgroundTasks/RoverHealthChecks/Repaired",
       repairedCount
+    );
+
+    // NEW: Record detailed battery metrics
+    global.newrelic.recordMetric(
+      "Custom/Rover/CriticalBatteryCount",
+      criticalCount
+    );
+
+    // NEW: Individual battery levels for distribution visualization
+    rovers.forEach((rover) => {
+      global.newrelic.recordMetric(
+        "Custom/Rover/BatteryLevelDistribution",
+        rover.batteryLevel
+      );
+    });
+
+    // NEW: Record fleet-wide battery statistics
+    global.newrelic.recordMetric(
+      "Custom/Rover/AverageBatteryLevel",
+      avgBatteryLevel
+    );
+
+    global.newrelic.recordMetric(
+      "Custom/Rover/MinimumBatteryLevel",
+      minBatteryLevel
     );
   }
 }
