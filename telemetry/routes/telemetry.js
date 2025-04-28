@@ -33,20 +33,17 @@ router.use((req, res, next) => {
 
 router.post("/receive", async (req, res, next) => {
   try {
-    let endSegment;
+    let segment;
     if (global.newrelic) {
-      endSegment = global.newrelic.startSegment(
-        "TelemetryProcessing",
-        true,
-        () => processTelemetryData(req.body)
-      );
+      segment = global.newrelic.startSegment("TelemetryProcessing", true);
     }
 
-    const result = await processTelemetryData(req.body);
-
-    if (endSegment) endSegment();
-
-    res.status(201).json(result);
+    try {
+      const result = await processTelemetryData(req.body);
+      res.status(201).json(result);
+    } finally {
+      if (segment) segment.end();
+    }
   } catch (err) {
     logger.error("Error receiving telemetry data:", err);
     next(err);
@@ -82,18 +79,18 @@ router.get("/rover/:roverId", async (req, res, next) => {
 
     let telemetryData;
     if (global.newrelic) {
-      const endSegment = global.newrelic.startSegment(
+      let segment = global.newrelic.startSegment(
         "MongoDB:TelemetryData.find",
-        true,
-        async () => {
-          telemetryData = await TelemetryData.find(query)
-            .sort({ timestamp: -1 })
-            .limit(limit)
-            .skip(skip);
-          return telemetryData;
-        }
+        true
       );
-      await endSegment();
+      try {
+        telemetryData = await TelemetryData.find(query)
+          .sort({ timestamp: -1 })
+          .limit(limit)
+          .skip(skip);
+      } finally {
+        segment.end();
+      }
     } else {
       telemetryData = await TelemetryData.find(query)
         .sort({ timestamp: -1 })

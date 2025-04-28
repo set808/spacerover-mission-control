@@ -131,47 +131,47 @@ roverSchema.methods.sendCommand = async function (command, params = {}) {
   const processingTime = Math.floor(Math.random() * 500) + 100;
   await new Promise((resolve) => setTimeout(resolve, processingTime));
 
-  let endCommandSpan;
+  let segment;
   if (global.newrelic) {
-    endCommandSpan = global.newrelic.startSegment(
-      `RoverCommand:${command}`,
-      true,
-      () => {
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            const success = Math.random() > 0.1;
-            if (!success) {
-              logger.error(`Command failed: ${command}`, {
-                roverId: this._id,
-                command,
-                reason: "Command execution error",
-              });
-
-              if (global.newrelic) {
-                global.newrelic.noticeError(
-                  new Error(`Rover command failed: ${command}`)
-                );
-              }
-            }
-            resolve(success);
-          }, processingTime);
-        });
-      }
-    );
+    segment = global.newrelic.startSegment(`RoverCommand:${command}`, true);
   }
 
-  this.lastContact = new Date();
-  await this.save();
+  try {
+    const success = await new Promise((resolve) => {
+      setTimeout(() => {
+        const success = Math.random() > 0.1;
+        if (!success) {
+          logger.error(`Command failed: ${command}`, {
+            roverId: this._id,
+            command,
+            reason: "Command execution error",
+          });
 
-  if (endCommandSpan) endCommandSpan();
+          if (global.newrelic) {
+            global.newrelic.noticeError(
+              new Error(`Rover command failed: ${command}`)
+            );
+          }
+        }
+        resolve(success);
+      }, processingTime);
+    });
 
-  return {
-    success: true,
-    command,
-    timestamp: new Date(),
-    roverId: this._id,
-    processingTime,
-  };
+    this.lastContact = new Date();
+    await this.save();
+
+    return {
+      success: true,
+      command,
+      timestamp: new Date(),
+      roverId: this._id,
+      processingTime,
+    };
+  } finally {
+    if (segment) {
+      segment.end();
+    }
+  }
 };
 
 roverSchema.statics.findLowBattery = function (threshold = 25) {
