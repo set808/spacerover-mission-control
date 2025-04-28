@@ -81,6 +81,7 @@ services:
     volumes:
       - ./telemetry:/app:ro
       - /app/node_modules
+      - newrelic_logs:/var/log/newrelic
     depends_on:
       mongodb:
         condition: service_healthy
@@ -154,6 +155,8 @@ services:
 
 volumes:
   mongodb_data:
+    driver: local
+  newrelic_logs:
     driver: local
 
 networks:

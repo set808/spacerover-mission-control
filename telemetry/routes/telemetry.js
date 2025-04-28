@@ -89,7 +89,7 @@ router.get("/rover/:roverId", async (req, res, next) => {
           .limit(limit)
           .skip(skip);
       } finally {
-        segment.end();
+        if (segment) segment.end();
       }
     } else {
       telemetryData = await TelemetryData.find(query)

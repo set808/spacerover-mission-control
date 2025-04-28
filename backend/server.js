@@ -3,6 +3,29 @@ const newrelic = require("newrelic");
 global.newrelic = newrelic;
 global.appStartTime = new Date();
 
+global.simulationState = {
+  memoryLeak: {
+    active: false,
+    interval: null,
+    arraySize: 0,
+  },
+  cpuLoad: {
+    active: false,
+    interval: null,
+    intensity: 0,
+  },
+  slowQuery: {
+    active: false,
+    delay: 0,
+  },
+  errorRate: 0,
+  logStorm: {
+    active: false,
+    interval: null,
+    rate: 0,
+  },
+};
+
 const express = require("express");
 const morgan = require("morgan");
 const mongoose = require("mongoose");
