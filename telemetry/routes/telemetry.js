@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const mongoose = require("mongoose"); // Add this import line
 const TelemetryData = require("../models/telemetryData");
 const { Rover } = require("../models/rover");
 const winston = require("winston");

@@ -1,5 +1,7 @@
 const newrelic = require("newrelic");
 
+global.newrelic = newrelic;
+
 const express = require("express");
 const morgan = require("morgan");
 const mongoose = require("mongoose");
@@ -42,7 +44,8 @@ const logger = createLogger({
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// app.locals.newrelic = newrelic;
+// Set New Relic in app.locals for Express context (in addition to global)
+app.locals.newrelic = newrelic;
 
 app.use(cors());
 app.use(express.json());
@@ -72,9 +75,6 @@ mongoose
   .catch((err) => {
     logger.error("MongoDB connection error:", err);
   });
-
-// const Rover = require("./models/rover");
-// const Mission = require("./models/mission");
 
 const roverRoutes = require("./routes/rover");
 const missionRoutes = require("./routes/mission");

@@ -8,7 +8,7 @@ RUN npm install
 
 COPY . .
 
-ENV REACT_APP_API_URL=http://localhost:4000
+ENV REACT_APP_API_URL=http://localhost:3000
 
 EXPOSE 3000
 
