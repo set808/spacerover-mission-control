@@ -21,12 +21,36 @@ const logger = createLogger({
   ],
 });
 
-let memoryLeakArray = [];
-let cpuLoadInterval = null;
-let slowQueryEnabled = false;
-let errorRatePercent = 0;
-let logStormEnabled = false;
-let logStormInterval = null;
+// Initialize global simulation state if it doesn't exist
+if (!global.simulationState) {
+  global.simulationState = {
+    memoryLeak: {
+      active: false,
+      interval: null,
+      arraySize: 0,
+      array: [],
+    },
+    cpuLoad: {
+      active: false,
+      interval: null,
+      intensity: 0,
+    },
+    slowQuery: {
+      active: false,
+      delay: 0,
+    },
+    errorRate: 0,
+    logStorm: {
+      active: false,
+      interval: null,
+      rate: 0,
+      severity: "all",
+    },
+  };
+}
+
+// Direct access to memory leak array for simulation
+let memoryLeakArray = global.simulationState.memoryLeak.array;
 
 router.use((req, res, next) => {
   if (
@@ -49,12 +73,16 @@ router.get("/status", (req, res) => {
   }
 
   const status = {
-    memoryLeak: memoryLeakArray.length > 0,
-    memoryLeakSize: `${(memoryLeakArray.length * 1024).toLocaleString()} bytes`,
-    cpuLoad: cpuLoadInterval !== null,
-    slowQuery: slowQueryEnabled,
-    errorRate: errorRatePercent,
-    logStorm: logStormEnabled,
+    memoryLeak: global.simulationState.memoryLeak.active,
+    memoryLeakSize: global.simulationState.memoryLeak.active
+      ? `${(
+          global.simulationState.memoryLeak.arraySize * 1024
+        ).toLocaleString()} bytes`
+      : "0 bytes",
+    cpuLoad: global.simulationState.cpuLoad.active,
+    slowQuery: global.simulationState.slowQuery.active,
+    errorRate: global.simulationState.errorRate,
+    logStorm: global.simulationState.logStorm.active,
   };
 
   logger.info("Simulation status retrieved", status);
@@ -70,49 +98,67 @@ router.post("/memory-leak/start", (req, res) => {
     global.newrelic.setTransactionName("api-simulation-memory-leak-start");
   }
 
+  // Stop any existing memory leak simulation first
+  if (global.simulationState.memoryLeak.interval) {
+    clearInterval(global.simulationState.memoryLeak.interval);
+    global.simulationState.memoryLeak.interval = null;
+  }
+
   const size = parseInt(req.query.size) || 1000;
   const interval = parseInt(req.query.interval) || 1000;
 
+  // Reset the memory leak array
   memoryLeakArray = [];
+  global.simulationState.memoryLeak.array = memoryLeakArray;
+  global.simulationState.memoryLeak.arraySize = 0;
 
   const leakInterval = setInterval(() => {
-    const newItems = Array(size)
-      .fill(0)
-      .map(() => ({
-        id: Math.random().toString(36).substring(2),
-        timestamp: new Date().toISOString(),
-        data: Buffer.alloc(1024).fill("A"), // Each object is roughly 1KB
-        nestedObject: {
-          properties: Array(10)
-            .fill(0)
-            .map((_, i) => ({ key: `property${i}`, value: Math.random() })),
-        },
-      }));
+    try {
+      const newItems = Array(size)
+        .fill(0)
+        .map(() => ({
+          id: Math.random().toString(36).substring(2),
+          timestamp: new Date().toISOString(),
+          data: Buffer.alloc(1024).fill("A"), // Each object is roughly 1KB
+          nestedObject: {
+            properties: Array(10)
+              .fill(0)
+              .map((_, i) => ({ key: `property${i}`, value: Math.random() })),
+          },
+        }));
 
-    memoryLeakArray.push(...newItems);
+      // Add items and update state
+      memoryLeakArray.push(...newItems);
+      global.simulationState.memoryLeak.arraySize = memoryLeakArray.length;
 
-    const memoryUsage = process.memoryUsage();
-    logger.warn("Memory leak simulation growing", {
-      heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB`,
-      arraySize: memoryLeakArray.length,
-      approximateMemoryUsage: `${Math.round(
-        (memoryLeakArray.length * 1024) / 1024
-      )} MB`,
-    });
+      const memoryUsage = process.memoryUsage();
+      logger.warn("Memory leak simulation growing", {
+        heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB`,
+        arraySize: memoryLeakArray.length,
+        approximateMemoryUsage: `${Math.round(
+          (memoryLeakArray.length * 1024) / 1024
+        )} MB`,
+      });
 
-    if (global.newrelic) {
-      global.newrelic.recordMetric(
-        "Custom/MemoryLeak/Size",
-        memoryLeakArray.length
-      );
-      global.newrelic.recordMetric(
-        "Custom/MemoryLeak/MB",
-        Math.round((memoryLeakArray.length * 1024) / 1024)
-      );
+      if (global.newrelic) {
+        global.newrelic.recordMetric(
+          "Custom/MemoryLeak/Size",
+          memoryLeakArray.length
+        );
+        global.newrelic.recordMetric(
+          "Custom/MemoryLeak/MB",
+          Math.round((memoryLeakArray.length * 1024) / 1024)
+        );
+      }
+    } catch (err) {
+      logger.error("Error in memory leak simulation:", err);
+      // Don't stop the simulation on error, just log it
     }
   }, interval);
 
-  global.memoryLeakInterval = leakInterval;
+  // Update state
+  global.simulationState.memoryLeak.active = true;
+  global.simulationState.memoryLeak.interval = leakInterval;
 
   logger.warn("Memory leak simulation started", {
     size,
@@ -142,18 +188,28 @@ router.post("/memory-leak/stop", (req, res) => {
     global.newrelic.setTransactionName("api-simulation-memory-leak-stop");
   }
 
-  if (global.memoryLeakInterval) {
-    clearInterval(global.memoryLeakInterval);
-    global.memoryLeakInterval = null;
-  }
-
   const finalSize = memoryLeakArray.length;
 
-  memoryLeakArray = [];
+  // Clean up interval
+  if (global.simulationState.memoryLeak.interval) {
+    clearInterval(global.simulationState.memoryLeak.interval);
+    global.simulationState.memoryLeak.interval = null;
+  }
 
+  // Reset array and state
+  memoryLeakArray = [];
+  global.simulationState.memoryLeak.array = memoryLeakArray;
+  global.simulationState.memoryLeak.arraySize = 0;
+  global.simulationState.memoryLeak.active = false;
+
+  // Try to free memory explicitly
   if (global.gc) {
-    global.gc();
-    logger.info("Garbage collection triggered");
+    try {
+      global.gc();
+      logger.info("Garbage collection triggered");
+    } catch (err) {
+      logger.error("Error during garbage collection:", err);
+    }
   }
 
   logger.info("Memory leak simulation stopped", {
@@ -185,13 +241,14 @@ router.post("/cpu-load/start", (req, res) => {
     global.newrelic.setTransactionName("api-simulation-cpu-load-start");
   }
 
+  // Stop any existing CPU load simulation
+  if (global.simulationState.cpuLoad.interval) {
+    clearInterval(global.simulationState.cpuLoad.interval);
+    global.simulationState.cpuLoad.interval = null;
+  }
+
   const intensity = parseInt(req.query.intensity) || 50;
   const duration = parseInt(req.query.duration) || 0;
-
-  if (cpuLoadInterval) {
-    clearInterval(cpuLoadInterval);
-    cpuLoadInterval = null;
-  }
 
   const consumeCPU = (percent) => {
     const start = Date.now();
@@ -207,30 +264,46 @@ router.post("/cpu-load/start", (req, res) => {
     return new Promise((resolve) => setTimeout(resolve, sleepMs));
   };
 
-  cpuLoadInterval = setInterval(async () => {
-    await consumeCPU(intensity);
+  const cpuLoadInterval = setInterval(async () => {
+    try {
+      await consumeCPU(intensity);
 
-    logger.warn("CPU load simulation running", {
-      intensity,
-      timestamp: new Date().toISOString(),
-    });
+      logger.warn("CPU load simulation running", {
+        intensity,
+        timestamp: new Date().toISOString(),
+      });
 
-    if (global.newrelic) {
-      global.newrelic.recordMetric("Custom/CPULoad/Intensity", intensity);
+      if (global.newrelic) {
+        global.newrelic.recordMetric("Custom/CPULoad/Intensity", intensity);
+      }
+    } catch (err) {
+      logger.error("Error in CPU load simulation:", err);
+      // Don't stop the simulation on error, just log it
     }
   }, 100);
 
+  // Update state
+  global.simulationState.cpuLoad.active = true;
+  global.simulationState.cpuLoad.interval = cpuLoadInterval;
+  global.simulationState.cpuLoad.intensity = intensity;
+
+  // Set up auto-stop if duration is specified
   if (duration > 0) {
     setTimeout(() => {
-      if (cpuLoadInterval) {
-        clearInterval(cpuLoadInterval);
-        cpuLoadInterval = null;
+      try {
+        if (global.simulationState.cpuLoad.active) {
+          clearInterval(global.simulationState.cpuLoad.interval);
+          global.simulationState.cpuLoad.interval = null;
+          global.simulationState.cpuLoad.active = false;
 
-        logger.info("CPU load simulation stopped (duration reached)", {
-          intensity,
-          duration,
-          timestamp: new Date().toISOString(),
-        });
+          logger.info("CPU load simulation stopped (duration reached)", {
+            intensity,
+            duration,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      } catch (err) {
+        logger.error("Error stopping CPU load simulation after duration:", err);
       }
     }, duration * 1000);
   }
@@ -266,15 +339,20 @@ router.post("/cpu-load/stop", (req, res) => {
     global.newrelic.setTransactionName("api-simulation-cpu-load-stop");
   }
 
-  if (cpuLoadInterval) {
-    clearInterval(cpuLoadInterval);
-    cpuLoadInterval = null;
-  } else {
+  if (!global.simulationState.cpuLoad.active) {
     return res.status(400).json({
       success: false,
       message: "No CPU load simulation is currently running",
     });
   }
+
+  // Clean up and update state
+  if (global.simulationState.cpuLoad.interval) {
+    clearInterval(global.simulationState.cpuLoad.interval);
+    global.simulationState.cpuLoad.interval = null;
+  }
+
+  global.simulationState.cpuLoad.active = false;
 
   logger.info("CPU load simulation stopped", {
     timestamp: new Date().toISOString(),
@@ -304,7 +382,9 @@ router.post("/slow-query/:action", (req, res) => {
   if (action === "start") {
     const delay = parseInt(req.query.delay) || 2000; // milliseconds
 
-    slowQueryEnabled = true;
+    // Update state
+    global.simulationState.slowQuery.active = true;
+    global.simulationState.slowQuery.delay = delay;
     global.slowQueryDelay = delay;
 
     logger.warn("Slow query simulation started", {
@@ -327,7 +407,9 @@ router.post("/slow-query/:action", (req, res) => {
       settings: { delay },
     });
   } else if (action === "stop") {
-    slowQueryEnabled = false;
+    // Update state
+    global.simulationState.slowQuery.active = false;
+    global.simulationState.slowQuery.delay = 0;
     global.slowQueryDelay = 0;
 
     logger.info("Slow query simulation stopped", {
@@ -368,7 +450,8 @@ router.post("/error-rate", (req, res) => {
     });
   }
 
-  errorRatePercent = rate;
+  // Update state
+  global.simulationState.errorRate = rate;
   global.errorRatePercent = rate;
 
   logger.warn("Error rate simulation set", {
@@ -398,57 +481,68 @@ router.post("/log-storm/:action", (req, res) => {
   }
 
   if (action === "start") {
+    // Stop any existing log storm
+    if (global.simulationState.logStorm.interval) {
+      clearInterval(global.simulationState.logStorm.interval);
+      global.simulationState.logStorm.interval = null;
+    }
+
     const rate = parseInt(req.query.rate) || 100;
     const severity = req.query.severity || "all";
 
-    if (logStormInterval) {
-      clearInterval(logStormInterval);
-      logStormInterval = null;
-    }
-
     const interval = Math.floor(1000 / rate);
-    logStormEnabled = true;
 
-    logStormInterval = setInterval(() => {
-      const logTypes = ["INFO", "WARN", "ERROR"];
-      const logType =
-        severity === "all"
-          ? logTypes[Math.floor(Math.random() * logTypes.length)]
-          : severity.toUpperCase();
+    const logStormInterval = setInterval(() => {
+      try {
+        const logTypes = ["INFO", "WARN", "ERROR"];
+        const logType =
+          severity === "all"
+            ? logTypes[Math.floor(Math.random() * logTypes.length)]
+            : severity.toUpperCase();
 
-      const randomId = Math.random().toString(36).substring(2, 15);
-      const messages = [
-        `Random log message for simulation ${randomId}`,
-        `System processing request ${randomId}`,
-        `User action completed ${randomId}`,
-        `Database query executed ${randomId}`,
-        `Network request completed ${randomId}`,
-        `File system operation ${randomId}`,
-        `Cache entry updated ${randomId}`,
-        `Authentication status changed ${randomId}`,
-        `Session created for user ${randomId}`,
-        `Resource allocation completed ${randomId}`,
-      ];
+        const randomId = Math.random().toString(36).substring(2, 15);
+        const messages = [
+          `Random log message for simulation ${randomId}`,
+          `System processing request ${randomId}`,
+          `User action completed ${randomId}`,
+          `Database query executed ${randomId}`,
+          `Network request completed ${randomId}`,
+          `File system operation ${randomId}`,
+          `Cache entry updated ${randomId}`,
+          `Authentication status changed ${randomId}`,
+          `Session created for user ${randomId}`,
+          `Resource allocation completed ${randomId}`,
+        ];
 
-      const message = messages[Math.floor(Math.random() * messages.length)];
+        const message = messages[Math.floor(Math.random() * messages.length)];
 
-      switch (logType) {
-        case "INFO":
-          logger.info(message, { simulatedLog: true, id: randomId });
-          break;
-        case "WARN":
-          logger.warn(message, { simulatedLog: true, id: randomId });
-          break;
-        case "ERROR":
-          logger.error(message, { simulatedLog: true, id: randomId });
-          if (global.newrelic) {
-            global.newrelic.noticeError(
-              new Error(`Simulated error: ${message}`)
-            );
-          }
-          break;
+        switch (logType) {
+          case "INFO":
+            logger.info(message, { simulatedLog: true, id: randomId });
+            break;
+          case "WARN":
+            logger.warn(message, { simulatedLog: true, id: randomId });
+            break;
+          case "ERROR":
+            logger.error(message, { simulatedLog: true, id: randomId });
+            if (global.newrelic) {
+              global.newrelic.noticeError(
+                new Error(`Simulated error: ${message}`)
+              );
+            }
+            break;
+        }
+      } catch (err) {
+        logger.error("Error in log storm simulation:", err);
+        // Don't stop the simulation on error, just log it
       }
     }, interval);
+
+    // Update state
+    global.simulationState.logStorm.active = true;
+    global.simulationState.logStorm.interval = logStormInterval;
+    global.simulationState.logStorm.rate = rate;
+    global.simulationState.logStorm.severity = severity;
 
     logger.warn("Log storm simulation started", {
       rate,
@@ -472,16 +566,20 @@ router.post("/log-storm/:action", (req, res) => {
       settings: { rate, severity },
     });
   } else if (action === "stop") {
-    if (logStormInterval) {
-      clearInterval(logStormInterval);
-      logStormInterval = null;
-      logStormEnabled = false;
-    } else {
+    if (!global.simulationState.logStorm.active) {
       return res.status(400).json({
         success: false,
         message: "No log storm simulation is currently running",
       });
     }
+
+    // Clean up and update state
+    if (global.simulationState.logStorm.interval) {
+      clearInterval(global.simulationState.logStorm.interval);
+      global.simulationState.logStorm.interval = null;
+    }
+
+    global.simulationState.logStorm.active = false;
 
     logger.info("Log storm simulation stopped", {
       timestamp: new Date().toISOString(),
