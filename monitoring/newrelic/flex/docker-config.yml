@@ -1,0 +1,5 @@
+integration_name: com.newrelic.docker
+
+instances:
+  - name: docker-integration
+    command: all_data
