@@ -1,0 +1,278 @@
+# New Relic Infrastructure Agent Configuration File
+#
+# This is a comprehensive configuration file for the New Relic Infrastructure Agent
+# to be used with the SpaceRover Mission Control application.
+#
+# Documentation: https://docs.newrelic.com/docs/infrastructure/install-infrastructure-agent/configuration/infrastructure-agent-configuration-settings/
+
+################################
+# REQUIRED CONFIGURATIONS
+################################
+
+# Your New Relic license key
+license_key: YOUR_LICENSE_KEY_HERE
+
+# Agent display name that will appear in the New Relic UI
+display_name: SpaceRover-Infrastructure
+
+################################
+# LOGGING CONFIGURATIONS
+################################
+
+# Log verbosity level - can be one of: error, warning, info, debug, trace
+log:
+  # Basic log settings
+  level: info
+  
+  # Log file path (default: /var/log/newrelic-infra/newrelic-infra.log)
+  file: /var/log/newrelic-infra/newrelic-infra.log
+  
+  # Maximum log file size in bytes before rotation (default: 25 MB)
+  file_max_size: 104857600  # 100 MB
+  
+  # Number of rotated log files to keep (default: 5)
+  file_backup_count: 10
+  
+  # Enable/disable forwarding infrastructure logs to New Relic platform
+  forward_to_newrelic: true
+  
+  # Log format: text or json
+  format: json
+
+################################
+# PROXY CONFIGURATIONS
+################################
+
+# HTTP proxy setting for all agent communications with New Relic
+# proxy: https://user:password@hostname:port
+
+################################
+# DOCKER MONITORING 
+################################
+
+# Enable/disable Docker container monitoring
+docker_enabled: true
+
+# Path to Docker socket for monitoring containers
+# docker_socket_path: /var/run/docker.sock
+
+# Include/exclude specific Docker containers by container name or ID
+container_filter:
+  # Include only specific containers by name or pattern
+  include:
+    - spacerover-*
+    - mongodb
+    - newrelic-*
+  
+  # Exclude specific containers by name or pattern
+  exclude:
+    - test-*
+    - *-temp
+  
+  # Specifies if agent should monitor all available containers
+  all: false
+
+################################
+# PROCESS MONITORING
+################################
+
+# Enable/disable process monitoring
+enable_process_metrics: true
+
+# Process metrics are collected at regular intervals, default is 30 seconds
+process_metrics:
+  # How often to collect process metrics (in seconds)
+  sample_rate: 15
+  
+  # Maximum number of processes to monitor (default: 20)
+  max_processes: 30
+  
+  # Configure process inclusion/exclusion
+  include:
+    # Include by process command or argument pattern
+    command_pattern:
+      - java
+      - node
+      - mongodb
+      - newrelic
+  
+  # Enable/disable collection of process arguments
+  include_args: false
+
+################################
+# INVENTORY CONFIGURATIONS
+################################
+
+# Control how often inventory data is collected (in seconds)
+inventory:
+  # General inventory collection interval (default: 15 mins)
+  interval: 600
+  
+  # Enable/disable individual inventory sources
+  sources:
+    docker: true
+    packages: true
+    processes: true
+    config_files: true
+    system: true
+    
+  # Monitor specific config files for changes
+  config_file_pattern:
+    # Paths to watch for config changes
+    include:
+      - /etc/newrelic-infra/
+      - /etc/newrelic-infra/integrations.d/
+      - /etc/docker/daemon.json
+      - /etc/*.conf
+    
+    # Paths to exclude from watching
+    exclude:
+      - /etc/hosts
+      - /etc/passwd
+
+################################
+# METRICS CONFIGURATIONS
+################################
+
+# Control how often agent metrics are collected and sent
+metrics:
+  # How often to collect and send metrics (in seconds)
+  sample_rate: 15
+  
+  # System samples collection settings
+  system_samples:
+    enabled: true
+    sample_rate: 15
+    
+  # Network interface metrics collection
+  network_metrics:
+    enabled: true
+    
+  # Storage metrics collection
+  storage_samples:
+    enabled: true
+    
+  # CPU percentage calculation mode (default: scaled)
+  # - scaled: (0-100% per core)
+  # - normalized: (0-100% for all cores)
+  cpu_mode: normalized
+
+################################
+# CUSTOM ATTRIBUTES
+################################
+
+# Custom attributes to attach to all data sent by the agent
+custom_attributes:
+  environment: production
+  application: spacerover-mission-control
+  team: devops
+  tier: monitoring
+  platform: docker
+  datacenter: us-west
+
+################################
+# INTEGRATIONS
+################################
+
+# Specify additional configuration for integrations
+integrations_config:
+  # Directory containing integration configuration files
+  directory: /etc/newrelic-infra/integrations.d/
+
+################################
+# CLOUD PROVIDER CONFIGURATION
+################################
+
+# Specify cloud provider detection and metadata collection
+cloud_security:
+  # Enable/disable cloud security monitoring (AWS, Azure, GCP)
+  enabled: true
+  
+  # Provider-specific configuration for AWS
+  aws:
+    metrics_polling_interval: 300  # seconds
+    
+  # Enable/disable specific cloud provider detection
+  detect_aws: true
+  detect_azure: false
+  detect_gcp: false
+  
+################################
+# ADVANCED CONFIGURATIONS
+################################
+
+# Control how agent identifies hosts in New Relic
+identity:
+  # Override hostname reported to New Relic
+  # hostname: custom-hostname
+  
+  # Persist instance ID between agent restarts
+  persist: true
+
+# Control how the agent collects and sends data to New Relic
+payload:
+  # Maximum size of payload in bytes (default: 1 MB)
+  max_size: 1048576
+  
+  # Compress payloads before sending (default: true)
+  compress: true
+
+# Network connection settings
+http:
+  # Timeout for HTTP requests to New Relic (in seconds)
+  timeout: 30
+  
+  # Use HTTP/2 protocol for communications
+  use_http2: true
+  
+  # CA bundle file for HTTPS connections
+  # ca_bundle_file: /etc/ssl/certs/ca-certificates.crt
+
+# Agent behavior when it can't connect to New Relic
+startup:
+  # Max time to wait for initial connection (in seconds)
+  timeout: 60
+  
+  # Reconnection settings
+  reconnect:
+    # Initial wait time (in seconds)
+    initial_wait: 5
+    
+    # Maximum wait time between retries (in seconds)
+    max_wait: 300
+    
+    # Maximum number of retries
+    max_retries: 10
+
+################################
+# FEATURE FLAGS
+################################
+
+# Enable/disable specific agent features
+features:
+  # Enable container monitoring features
+  docker_enabled: true
+  
+  # Enable Kubernetes integration
+  k8s_enabled: false
+  
+  # Enable log forwarding
+  log_forwarding_enabled: true
+  
+  # Enable prometheus integration
+  prometheus_enabled: true
+
+################################
+# PLUGINS / EXTENSIONS
+################################
+
+# Additional external executable plugins
+plugins:
+  # How often to run plugins (in seconds)
+  interval: 60
+  
+  # Directory containing plugin executables
+  directory: /var/db/newrelic-infra/plugins/
+  
+  # Maximum plugin execution time (in seconds)
+  timeout: 30

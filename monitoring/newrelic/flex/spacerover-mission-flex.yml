@@ -1,0 +1,37 @@
+# SpaceRover Mission Control Flex Integration
+# This integration focuses on collecting mission data from the SpaceRover Mission Control API
+integrations:
+  - name: nri-flex
+    interval: 60s
+    config:
+      name: spacerover-mission-stats
+      apis:
+        - name: mission-stats
+          url: http://localhost:4000/api/missions
+          event_type: SpaceRoverMission
+          headers:
+            Accept: application/json
+          jq: ".[]"
+          # JQ processor to transform JSON to meaningful metrics
+          processors:
+            # Extract mission status indicators
+            - jq:
+                active: "if .status == \"active\" then 1 else 0 end"
+                completed: "if .status == \"completed\" then 1 else 0 end" 
+                suspended: "if .status == \"suspended\" then 1 else 0 end"
+                failed: "if .status == \"failed\" then 1 else 0 end"
+                
+                # Calculate metrics from mission data
+                mission_duration_days: "if .startDate != null and .endDate != null then (((.endDate | sub(\"\\\\.[0-9]+Z$\"; \"Z\") | fromdate) - (.startDate | sub(\"\\\\.[0-9]+Z$\"; \"Z\") | fromdate)) / 86400000) else (if .startDate != null then ((now | todate) - (.startDate | sub(\"\\\\.[0-9]+Z$\"; \"Z\") | fromdate)) / 86400000 else 0 end) end"
+                
+                # Calculate objective completion rate
+                objective_count: "if .objectives then .objectives | length else 0 end"
+                completed_objectives: "if .objectives then .objectives | map(select(.completed == true)) | length else 0 end"
+                objectives_completion_rate: "if (.objectives | length) > 0 then ((.objectives | map(select(.completed == true)) | length) / (.objectives | length) * 100) else 0 end"
+                
+                # Priority metrics
+                critical_objectives: "if .objectives then .objectives | map(select(.priority == \"critical\")) | length else 0 end"
+                high_objectives: "if .objectives then .objectives | map(select(.priority == \"high\")) | length else 0 end"
+                
+          custom_attributes:
+            flex_source: spacerover_mission_control
