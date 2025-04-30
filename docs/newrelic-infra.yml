@@ -261,18 +261,3 @@ features:
   
   # Enable prometheus integration
   prometheus_enabled: true
-
-################################
-# PLUGINS / EXTENSIONS
-################################
-
-# Additional external executable plugins
-plugins:
-  # How often to run plugins (in seconds)
-  interval: 60
-  
-  # Directory containing plugin executables
-  directory: /var/db/newrelic-infra/plugins/
-  
-  # Maximum plugin execution time (in seconds)
-  timeout: 30
