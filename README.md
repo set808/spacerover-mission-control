@@ -2,8 +2,6 @@
 
 A full-stack monitoring sandbox for the "Advanced Full Stack Monitoring Course with New Relic." This application provides a comprehensive environment for learning and demonstrating monitoring concepts including APM, Infrastructure, and Logs.
 
-![SpaceRover Mission Control Banner](docs/images/banner.png)
-
 ## 🚀 Application Overview
 
 SpaceRover Mission Control simulates a space agency's mission control center that monitors and controls a fleet of rovers exploring distant planets. The application is designed to demonstrate various monitoring concepts in a practical, engaging way.
@@ -14,14 +12,13 @@ SpaceRover Mission Control simulates a space agency's mission control center tha
 2. **Fleet Command Service (Backend API)**: Node.js/Express service for rover command and mission management
 3. **Telemetry Processor (Background Service)**: Worker service for processing incoming rover data
 4. **Mission Database**: MongoDB database storing mission and rover information
-5. **Simulation Tools**: Configurable tools to generate monitoring scenarios
+5. **Monitoring Tools**: Tools to observe and analyze application performance
 
 ## 🎓 Educational Features
 
 - **Built-in Monitoring**: Pre-configured for New Relic integration
-- **Configurable Issues**: Trigger performance bottlenecks, memory leaks, and errors on demand
-- **Structured Logs**: Various log formats and patterns for log monitoring demonstrations
 - **Realistic Telemetry**: Simulated rover data that changes over time
+- **Structured Logs**: Various log formats and patterns for log monitoring demonstrations
 - **Progressive Complexity**: Components can be introduced gradually as students progress
 - **Complete Documentation**: Each component includes details about monitoring opportunities
 
@@ -38,7 +35,7 @@ SpaceRover Mission Control simulates a space agency's mission control center tha
 ### Prerequisites
 
 - [Docker](https://www.docker.com/get-started) and [Docker Compose](https://docs.docker.com/compose/install/)
-- [Node.js](https://nodejs.org/) v14+ (for local development only)
+- [Node.js](https://nodejs.org/) (v16+ for frontend, v23+ for backend services if running locally)
 - [New Relic account](https://newrelic.com/signup) (free tier available)
 
 ### Quick Start with Docker
@@ -105,17 +102,7 @@ The main dashboard shows an overview of all rovers, their status, and telemetry 
 - See alerts for critical conditions
 - Monitor real-time telemetry updates
 
-### Simulation Panel
 
-Use the Simulation Panel to trigger different monitoring scenarios:
-
-- **Memory Leak**: Simulates memory leaks at configurable rates
-- **CPU Load**: Generates high CPU usage patterns
-- **Slow Queries**: Introduces delays in database operations
-- **Error Rate**: Configures random error generation
-- **Log Storm**: Creates log entries at different volumes and severities
-
-These scenarios help demonstrate how monitoring tools detect and alert on various issues.
 
 ### New Relic Integration
 
@@ -172,13 +159,13 @@ This application is designed to support the "Advanced Full Stack Monitoring Cour
 
 You can customize various aspects of the application:
 
-### Simulation Settings
+### Customization Settings
 
-Edit `docker-compose.yml` to change default simulation parameters:
+Edit `docker-compose.yml` to change environment parameters:
 ```yaml
 environment:
   - ENABLE_SIMULATED_ISSUES=true
-  - SIMULATION_INTENSITY=medium  # Options: low, medium, high
+  - LOAD_INTENSITY=medium  # Options: low, medium, high
 ```
 
 ### Adding New Rovers
@@ -196,6 +183,25 @@ curl -X POST http://localhost:4000/api/rovers -H "Content-Type: application/json
   "capabilities": ["imaging", "sampling", "drilling"]
 }'
 ```
+
+### Load Generation
+
+The application includes a load generator that can be configured through environment variables:
+```yaml
+load-generator:
+  environment:
+    - SCENARIO=default
+    - INTENSITY=medium  # Options: low, medium, high
+```
+
+## ⚙️ Technical Details
+
+- **Frontend**: React 17, React Router 6, Recharts for data visualization
+- **Backend**: Node.js 23 on Alpine, Express 4, Winston for logging
+- **Telemetry Service**: Node.js 23, Express, real-time data processing
+- **Database**: MongoDB latest
+- **Monitoring**: New Relic APM, Infrastructure, Browser monitoring
+- **Container Management**: Docker Compose orchestration
 
 ## 🤝 Contributing
 
